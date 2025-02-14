@@ -1,6 +1,7 @@
 ---
 - name: Update
   become: true
+  become_method: sudo
   hosts: all
   gather_facts: false
   tasks:
