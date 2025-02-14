@@ -6,15 +6,15 @@
   hosts: all
   gather_facts: true
   tasks:
-    - name: Ensure APT is not locked
-      shell: "lsof /var/lib/dpkg/lock || echo 'not locked'"
-      register: apt_lock
+    - name: Ensure APT is not running
+      shell: "ps aux | grep -E '[a]pt|[d]pkg' || echo 'not running'"
+      register: apt_process
       changed_when: false
 
-    - name: Fail if APT is locked
+    - name: Fail if APT is running
       fail:
-        msg: "APT is locked, another process might be running updates!"
-      when: "'not locked' not in apt_lock.stdout"
+        msg: "APT is currently running another process! Try again later."
+      when: "'not running' not in apt_process.stdout"
 
     - name: Update apt repo and cache
       apt:
@@ -43,11 +43,6 @@
         path: /var/run/reboot-required
       register: reboot_required_file
 
-    - name: Display reboot message if required
-      debug:
-        msg: "Reboot required. Proceeding with reboot..."
-      when: reboot_required_file.stat.exists
-
     - name: Reboot if required
       reboot:
         msg: "Reboot initiated by Ansible due to kernel update"
@@ -66,7 +61,7 @@
         name: Europe/Copenhagen
 
     - name: Install common utilities
-      apt:
+      package:
         name:
           - curl
           - wget
@@ -78,16 +73,30 @@
           - tmux
         state: present
 
-    - name: Disable and remove swap
-      command: swapoff -a
-      when: ansible_swaptotal_mb > 0
+    - name: Disable and remove swap permanently
+      block:
+        - name: Disable swap
+          command: swapoff -a
+          when: ansible_swaptotal_mb > 0
 
-    - name: Remove swap entry from fstab
-      replace:
-        path: /etc/fstab
-        regexp: '.*swap.*'
-        replace: ''
+        - name: Remove swap entry from fstab
+          lineinfile:
+            path: /etc/fstab
+            state: absent
+            regexp: '.*swap.*'
       notify: Reboot System
+
+    - name: Pre-configure unattended-upgrades to avoid prompts
+      debconf:
+        name: unattended-upgrades
+        question: unattended-upgrades/enable_auto_updates
+        value: "true"
+        vtype: boolean
+
+    - name: Ensure unattended-upgrades is installed
+      package:
+        name: unattended-upgrades
+        state: present
 
     - name: Enable automatic security updates
       copy:
@@ -95,11 +104,6 @@
         content: |
           APT::Periodic::Update-Package-Lists "1";
           APT::Periodic::Unattended-Upgrade "1";
-
-    - name: Ensure unattended-upgrades is installed
-      apt:
-        name: unattended-upgrades
-        state: present
 
     - name: Configure unattended-upgrades
       copy:
@@ -114,7 +118,7 @@
           Unattended-Upgrade::Automatic-Reboot "true";
           Unattended-Upgrade::Automatic-Reboot-Time "03:00";
 
-    - name: Enable unattended-upgrades service
+    - name: Enable and start unattended-upgrades service
       systemd:
         name: unattended-upgrades
         enabled: true
