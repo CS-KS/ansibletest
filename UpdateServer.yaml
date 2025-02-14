@@ -2,7 +2,6 @@
 - name: Update
   become: true
   become_method: sudo
-  become_ask_pass: true
   hosts: all
   gather_facts: false
   tasks:
