@@ -1,0 +1,7 @@
+---
+- name: Hello World Playbook
+  become: true
+  tasks:
+    - name: Print Hello World message
+      debug:
+        msg: "Hello, World! This is an Ansible playbook running in Semaphore UI."
