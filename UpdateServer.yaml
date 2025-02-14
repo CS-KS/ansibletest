@@ -60,76 +60,70 @@
       tags: 
         - reboot
 
-    - name: Initial System Setup
-      become: true
-      become_method: sudo
-      become_user: root
-      hosts: all
-      gather_facts: true
-      tasks:
-        - name: Set timezone to Europe/Copenhagen
-          timezone:
-            name: Europe/Copenhagen
+    # ----------- INITIAL SYSTEM SETUP (Nu en del af playbooken) -----------
+    - name: Set timezone to Europe/Copenhagen
+      timezone:
+        name: Europe/Copenhagen
 
-        - name: Install common utilities
-          apt:
-            name:
-              - curl
-              - wget
-              - htop
-              - unzip
-              - git
-              - net-tools
-              - vim
-              - tmux
-            state: present
+    - name: Install common utilities
+      apt:
+        name:
+          - curl
+          - wget
+          - htop
+          - unzip
+          - git
+          - net-tools
+          - vim
+          - tmux
+        state: present
 
-        - name: Disable and remove swap
-          command: swapoff -a
-          when: ansible_swaptotal_mb > 0
+    - name: Disable and remove swap
+      command: swapoff -a
+      when: ansible_swaptotal_mb > 0
 
-        - name: Remove swap entry from fstab
-          replace:
-            path: /etc/fstab
-            regexp: '.*swap.*'
-            replace: ''
-          notify: Reboot System
+    - name: Remove swap entry from fstab
+      replace:
+        path: /etc/fstab
+        regexp: '.*swap.*'
+        replace: ''
+      notify: Reboot System
 
-        - name: Enable automatic security updates
-          copy:
-            dest: /etc/apt/apt.conf.d/20auto-upgrades
-            content: |
-              APT::Periodic::Update-Package-Lists "1";
-              APT::Periodic::Unattended-Upgrade "1";
+    - name: Enable automatic security updates
+      copy:
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        content: |
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Unattended-Upgrade "1";
 
-        - name: Ensure unattended-upgrades is installed
-          apt:
-            name: unattended-upgrades
-            state: present
+    - name: Ensure unattended-upgrades is installed
+      apt:
+        name: unattended-upgrades
+        state: present
 
-        - name: Configure unattended-upgrades
-          copy:
-            dest: /etc/apt/apt.conf.d/50unattended-upgrades
-            content: |
-              Unattended-Upgrade::Allowed-Origins {
-                  "${distro_id}:${distro_codename}";
-                  "${distro_id}:${distro_codename}-security";
-                  "${distro_id}ESMApps:${distro_codename}";
-                  "${distro_id}ESM:${distro_codename}";
-              };
-              Unattended-Upgrade::Automatic-Reboot "true";
-              Unattended-Upgrade::Automatic-Reboot-Time "03:00";
+    - name: Configure unattended-upgrades
+      copy:
+        dest: /etc/apt/apt.conf.d/50unattended-upgrades
+        content: |
+          Unattended-Upgrade::Allowed-Origins {
+              "${distro_id}:${distro_codename}";
+              "${distro_id}:${distro_codename}-security";
+              "${distro_id}ESMApps:${distro_codename}";
+              "${distro_id}ESM:${distro_codename}";
+          };
+          Unattended-Upgrade::Automatic-Reboot "true";
+          Unattended-Upgrade::Automatic-Reboot-Time "03:00";
 
-        - name: Enable unattended-upgrades service
-          systemd:
-            name: unattended-upgrades
-            enabled: true
-            state: started
+    - name: Enable unattended-upgrades service
+      systemd:
+        name: unattended-upgrades
+        enabled: true
+        state: started
 
-      handlers:
-        - name: Reboot System
-          reboot:
-            msg: "Rebooting to apply swap changes"
-            pre_reboot_delay: 5
-            post_reboot_delay: 20
-            reboot_timeout: 300
+  handlers:
+    - name: Reboot System
+      reboot:
+        msg: "Rebooting to apply swap changes"
+        pre_reboot_delay: 5
+        post_reboot_delay: 20
+        reboot_timeout: 300
